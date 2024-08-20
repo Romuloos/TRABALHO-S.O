@@ -1,1 +1,77 @@
+import threading
+import random
+import time
 
+class Mine:
+    def __init__(self):
+        #Inicializa os recursos da mina, seus valores e a pontuação dos mineiros
+        self.recursos = {
+            "ouro": 100,
+            "diamante": 50,
+            "rubi": 30,
+            "esmeralda": 20,
+            "safira": 10
+        }
+        self.valores = {
+            "ouro": 1,
+            "diamante": 5,
+            "rubi": 3,
+            "esmeralda": 2,
+            "safira": 4
+        }
+        self.pontuacoes = {i: 0 for i in range(num_mineiros)}
+        self.condition = threading.Condition()
+        self.resources_exhausted = False  #Flag para indicar se os recursos foram esgotados
+
+    def extrair(self, miner_id):
+        while True:
+            with self.condition:
+                #Verifica se os recursos estão esgotados e se todas as quantidades foram consumidas
+                if self.resources_exhausted and sum(self.recursos.values()) == 0:
+                    break
+                
+                #Escolhe um recurso aleatório
+                recurso_escolhido = random.choice(list(self.recursos.keys()))
+                quantidade_disponivel = self.recursos[recurso_escolhido]
+                
+                if quantidade_disponivel > 0:
+                    #Determina a quantidade a ser extraída e atualiza os recursos e pontuação
+                    quantidade_extraida = random.randint(1, min(max_extracao, quantidade_disponivel))
+                    self.recursos[recurso_escolhido] -= quantidade_extraida
+                    self.pontuacoes[miner_id] += quantidade_extraida * self.valores[recurso_escolhido]
+                    print(f"Mineiro {miner_id} extraiu {quantidade_extraida} de {recurso_escolhido}.")
+                    
+                    #Notifica todos os mineiros sobre a mudança nos recursos
+                    self.condition.notify_all()
+                    
+                    time.sleep(1)  #Simula o tempo de extração
+                else:
+                    #Aguarda se o recurso escolhido está esgotado com limite de tempo
+                    self.condition.wait(timeout=1)
+                    
+                #Atualiza o estado de recursos esgotados
+                if sum(self.recursos.values()) == 0:
+                    self.resources_exhausted = True
+                    #Notifica todos os mineiros de que os recursos foram esgotados
+                    self.condition.notify_all()
+
+if __name__ == "__main__":
+    num_mineiros = 5
+    max_extracao = 5
+    mina = Mine()
+    
+    threads = []
+    for i in range(num_mineiros):
+        #Cria e inicia uma thread para cada mineiro
+        t = threading.Thread(target=mina.extrair, args=(i,))
+        threads.append(t)
+        t.start()
+
+    for t in threads:
+        #Aguarda todos as threads terminarem
+        t.join()
+
+    # Exibe as pontuações finais dos mineiros
+    print("\nPontuação final dos mineiros:")
+    for miner_id, pontuacao in mina.pontuacoes.items():
+        print(f"Mineiro {miner_id}: {pontuacao} pontos")
