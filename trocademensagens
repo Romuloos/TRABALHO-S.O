@@ -1,0 +1,90 @@
+import threading
+import queue
+import random
+import time
+
+class Miner:
+    def __init__(self, miner_id, recursos, valores, shared_queue, max_extracao):
+        #Inicializa o mineiro com ID, recursos, valores, fila compartilhada e máxima extração
+        self.miner_id = miner_id
+        self.recursos = recursos
+        self.valores = valores
+        self.shared_queue = shared_queue
+        self.max_extracao = max_extracao
+        self.pontuacao = 0
+        self.thread = threading.Thread(target=self.run)
+        self.keep_running = True
+
+    def run(self):
+        while self.keep_running:
+            try:
+                #Recebe uma mensagem da fila compartilhada indicando se há recursos disponíveis
+                message = self.shared_queue.get(timeout=1)
+                if message == "recursos_disponiveis":
+                    recurso_escolhido = random.choice(list(self.recursos.keys()))
+                    if self.recursos[recurso_escolhido] > 0:
+                        #Determina a quantidade a ser extraída e atualiza recursos e pontuação
+                        quantidade_extraida = random.randint(1, min(self.max_extracao, self.recursos[recurso_escolhido]))
+                        self.recursos[recurso_escolhido] -= quantidade_extraida
+                        self.pontuacao += quantidade_extraida * self.valores[recurso_escolhido]
+                        print(f"Mineiro {self.miner_id} extraiu {quantidade_extraida} de {recurso_escolhido}.")
+                    #Se ainda há recursos disponíveis coloca uma nova mensagem na fila
+                    if sum(self.recursos.values()) > 0:
+                        self.shared_queue.put("recursos_disponiveis")
+            except queue.Empty:
+                #Se a fila estiver vazia continua tentando
+                continue
+            time.sleep(1)  #Pausa para simular tempo de extração
+
+    def stop(self):
+        #Define keep_running como False para parar o loop de execução
+        self.keep_running = False
+
+if __name__ == "__main__":
+    num_mineiros = 5
+    recursos = {
+        "ouro": 100,
+        "diamante": 50,
+        "rubi": 30,
+        "esmeralda": 20,
+        "safira": 10
+    }
+
+    valores = {
+        "ouro": 1,
+        "diamante": 5,
+        "rubi": 3,
+        "esmeralda": 2,
+        "safira": 4
+    }
+
+    max_extracao = 5
+    shared_queue = queue.Queue()
+    miners = []
+    
+    for i in range(num_mineiros):
+        #Cria e inicia um thread para cada mineiro
+        miner = Miner(i, recursos, valores, shared_queue, max_extracao)
+        miners.append(miner)
+        miner.thread.start()
+    
+    #Inicializa a mina com recursos disponíveis
+    for _ in range(num_mineiros):
+        shared_queue.put("recursos_disponiveis")
+    
+    #Monitora o progresso até que todos os recursos sejam extraídos
+    while sum(recursos.values()) > 0:
+        time.sleep(1)
+    
+    #Para todas as threads de mineração
+    for miner in miners:
+        miner.stop()
+    
+    for miner in miners:
+        #Aguarda todas as threads terminarem
+        miner.thread.join()
+
+    #Exibe as pontuações finais
+    print("\nPontuação final dos mineiros:")
+    for miner in miners:
+        print(f"Mineiro {miner.miner_id}: {miner.pontuacao} pontos")
